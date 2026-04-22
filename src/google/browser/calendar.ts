@@ -97,8 +97,9 @@ async function ensureCalendarPage(page: Page, url: string): Promise<void> {
   }
 
   if (host !== "calendar.google.com") {
+    const actualHost = host || "an unknown page";
     throw new Error(
-      "DeskPilot could not access Google Calendar in the browser profile. Run `deskpilot auth google --provider browser` first.",
+      `DeskPilot could not access Google Calendar in the saved browser profile. Re-run \`deskpilot auth google\` while \`google.mode\` is \`browser\`, complete sign-in in the DeskPilot Chrome window, close that window, and retry. Expected calendar.google.com but landed on ${actualHost}.`,
     );
   }
 }

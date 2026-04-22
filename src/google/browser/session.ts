@@ -8,10 +8,9 @@ import {
 } from "playwright-core";
 
 import type { DeskPilotConfig } from "../../types/config.js";
+import { CALENDAR_URL, GMAIL_URL } from "./targets.js";
 
-const GMAIL_URL = "https://mail.google.com/mail/u/0/#inbox";
-const CALENDAR_URL = "https://calendar.google.com/calendar/u/0/r";
-const DEFAULT_AUTH_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_BROWSER_VALIDATION_TIMEOUT_MS = 5 * 60 * 1000;
 
 const KNOWN_CHROME_PATHS: Partial<Record<NodeJS.Platform, string[]>> = {
   darwin: [
@@ -194,16 +193,26 @@ export class BrowserGoogleSessionManager {
   }
 }
 
-export async function ensureBrowserGoogleAuthenticated(
+export async function validateBrowserGoogleProfile(
   session: BrowserGoogleSessionManager,
-  timeoutMs = DEFAULT_AUTH_TIMEOUT_MS,
+  timeoutMs = DEFAULT_BROWSER_VALIDATION_TIMEOUT_MS,
 ): Promise<void> {
   await session.withPage(async (page) => {
     await page.goto(GMAIL_URL, { waitUntil: "domcontentloaded" });
-    await waitForAppHost(page, "mail.google.com", timeoutMs, "DeskPilot browser auth");
+    await waitForAppHost(
+      page,
+      "mail.google.com",
+      timeoutMs,
+      "DeskPilot browser profile validation",
+    );
 
     await page.goto(CALENDAR_URL, { waitUntil: "domcontentloaded" });
-    await waitForAppHost(page, "calendar.google.com", timeoutMs, "DeskPilot browser auth");
+    await waitForAppHost(
+      page,
+      "calendar.google.com",
+      timeoutMs,
+      "DeskPilot browser profile validation",
+    );
   });
 }
 
@@ -219,11 +228,4 @@ export async function assertBrowserGoogleAuthenticated(
       "DeskPilot browser access",
     );
   });
-}
-
-export function browserAuthTargets(): { gmailUrl: string; calendarUrl: string } {
-  return {
-    gmailUrl: GMAIL_URL,
-    calendarUrl: CALENDAR_URL,
-  };
 }

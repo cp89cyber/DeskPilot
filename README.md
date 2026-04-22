@@ -61,8 +61,15 @@ You can also symlink or install it however you normally manage local Node CLIs.
 ## Google Configuration
 
 DeskPilot defaults to browser mode for Gmail and Calendar. It launches a dedicated
-Chrome profile under `~/.deskpilot/browser/google-chrome`, and you sign into Google
-there with `deskpilot auth google`.
+Chrome profile under `~/.deskpilot/browser/google-chrome`.
+
+`node dist/cli.js auth google` follows `google.mode` by default:
+
+- In `browser` mode it opens a normal Chrome window with the dedicated DeskPilot
+  profile. You sign in there manually, close that DeskPilot Chrome window, and
+  DeskPilot then validates the saved profile with Playwright.
+- In `oauth` mode it opens the Google OAuth flow in your browser and stores
+  tokens at `~/.deskpilot/google-oauth.json`.
 
 Drive is still OAuth-backed in this version. If you want Drive tools, or if you prefer
 the original API-backed Google integration, configure OAuth credentials and switch
@@ -131,14 +138,22 @@ Then authenticate against Google:
 node dist/cli.js auth google
 ```
 
-This opens the dedicated DeskPilot Chrome profile and waits for Gmail and Calendar
-to become available in that browser session.
+This uses the provider configured in `google.mode`.
 
-If you want the legacy OAuth flow instead:
+In browser mode, DeskPilot opens a normal Chrome window for manual sign-in, asks
+you to close that DeskPilot Chrome window when Gmail and Calendar are working, and
+then validates the saved profile.
+
+If you want to override the configured provider for a single auth run:
 
 ```bash
+node dist/cli.js auth google --provider browser
 node dist/cli.js auth google --provider oauth
 ```
+
+If `--provider` does not match `google.mode`, DeskPilot authenticates with the
+requested provider, leaves `~/.deskpilot/config.json` unchanged, and prints a
+warning that runtime commands still follow `google.mode`.
 
 OAuth tokens are stored at:
 
@@ -147,6 +162,10 @@ OAuth tokens are stored at:
 ```
 
 with `0600` permissions when OAuth is used.
+
+Google may reject first-time sign-in attempts inside automated browsers with
+errors such as "This browser or app may not be secure". DeskPilot no longer uses
+an automated browser for the manual Google sign-in step in browser mode.
 
 ## Troubleshooting
 

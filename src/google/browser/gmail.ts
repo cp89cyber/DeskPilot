@@ -42,8 +42,9 @@ async function ensureGmailPage(page: Page, url: string): Promise<void> {
   }
 
   if (host !== "mail.google.com") {
+    const actualHost = host || "an unknown page";
     throw new Error(
-      "DeskPilot could not access Gmail in the browser profile. Run `deskpilot auth google --provider browser` first.",
+      `DeskPilot could not access Gmail in the saved browser profile. Re-run \`deskpilot auth google\` while \`google.mode\` is \`browser\`, complete sign-in in the DeskPilot Chrome window, close that window, and retry. Expected mail.google.com but landed on ${actualHost}.`,
     );
   }
 }
