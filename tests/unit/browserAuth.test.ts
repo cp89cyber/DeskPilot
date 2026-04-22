@@ -3,6 +3,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DeskPilotConfig } from "../../src/types/config.js";
 
 const mocks = vi.hoisted(() => ({
+  BrowserProfileInUseError: class BrowserProfileInUseError extends Error {
+    readonly host?: string;
+
+    readonly pid?: number;
+
+    readonly profileDir: string;
+
+    constructor(profileDir: string, host?: string, pid?: number) {
+      super("profile in use");
+      this.name = "BrowserProfileInUseError";
+      this.profileDir = profileDir;
+      this.host = host;
+      this.pid = pid;
+    }
+  },
   close: vi.fn(),
   createInterface: vi.fn(),
   execa: vi.fn(),
@@ -32,6 +47,7 @@ vi.mock("../../src/google/browser/session.js", () => ({
       await mocks.close();
     }
   },
+  BrowserProfileInUseError: mocks.BrowserProfileInUseError,
   validateBrowserGoogleProfile: mocks.validateBrowserGoogleProfile,
 }));
 
@@ -95,6 +111,7 @@ describe("browser auth helper", () => {
         "--new-window",
         "--no-first-run",
         "--no-default-browser-check",
+        "--disable-background-mode",
         "https://mail.google.com/mail/u/0/#inbox",
         "https://calendar.google.com/calendar/u/0/r",
       ],
@@ -130,15 +147,24 @@ describe("browser auth helper", () => {
     expect(mocks.execa).not.toHaveBeenCalled();
   });
 
-  it("maps validation failures to a close-the-window instruction", async () => {
-    mocks.validateBrowserGoogleProfile.mockRejectedValue(new Error("SingletonLock"));
+  it("maps profile-in-use validation failures to a close-the-window instruction", async () => {
+    mocks.validateBrowserGoogleProfile.mockRejectedValue(
+      new mocks.BrowserProfileInUseError(
+        "/tmp/home/browser/google-chrome",
+        "penguin",
+        445,
+      ),
+    );
     const authentication = authenticateBrowserProfile(makeConfig());
 
     await expect(authentication).rejects.toThrow(
-      "DeskPilot could not validate the saved Chrome profile.",
+      "DeskPilot could not validate the saved Chrome profile because Chrome is still using it.",
     );
     await expect(authentication).rejects.toThrow(
-      "Close every DeskPilot Chrome window using /tmp/home/browser/google-chrome",
+      "Holding PID: 445 on penguin",
+    );
+    await expect(authentication).rejects.toThrow(
+      "Fully quit every DeskPilot Chrome window using /tmp/home/browser/google-chrome",
     );
   });
 });
