@@ -24,6 +24,10 @@ function makeConfig(): DeskPilotConfig {
     model: "gpt-5.4",
     codexBinary: "codex",
     mcpServerName: "deskpilot-workspace",
+    googleMode: "browser",
+    googleBrowser: {
+      profileDir: path.join(tempDir, "browser-profile"),
+    },
   };
 }
 

@@ -1,6 +1,5 @@
 import type { Logger } from "../logger.js";
-import { createCalendarEvent } from "../google/calendar.js";
-import { createGmailDraft } from "../google/gmail.js";
+import { createGoogleWorkspaceProvider } from "../google/provider.js";
 import type { DeskPilotConfig } from "../types/config.js";
 import type { PendingAction } from "../types/actions.js";
 import type { PendingActionsRepository } from "../storage/repositories.js";
@@ -21,17 +20,30 @@ export async function applyPendingAction(
     throw new Error(`Action ${action.id} is already applied.`);
   }
 
+  const provider = createGoogleWorkspaceProvider(config);
   let externalId: string;
-  if (action.kind === "gmail_draft") {
-    const payload = JSON.parse(action.payloadJson) as GmailDraftPayload;
-    const result = await createGmailDraft(config, payload);
-    externalId = result.id;
-  } else if (action.kind === "calendar_event") {
-    const payload = JSON.parse(action.payloadJson) as CalendarEventPayload;
-    const result = await createCalendarEvent(config, payload);
-    externalId = result.id ?? payload.summary;
-  } else {
-    throw new Error(`Unsupported action kind: ${action.kind}`);
+  try {
+    if (action.kind === "gmail_draft") {
+      if (!provider.gmail) {
+        throw new Error("Gmail is not available for the configured Google provider.");
+      }
+
+      const payload = JSON.parse(action.payloadJson) as GmailDraftPayload;
+      const result = await provider.gmail.createDraft(payload);
+      externalId = result.id;
+    } else if (action.kind === "calendar_event") {
+      if (!provider.calendar) {
+        throw new Error("Google Calendar is not available for the configured Google provider.");
+      }
+
+      const payload = JSON.parse(action.payloadJson) as CalendarEventPayload;
+      const result = await provider.calendar.createEvent(payload);
+      externalId = result.id ?? payload.summary;
+    } else {
+      throw new Error(`Unsupported action kind: ${action.kind}`);
+    }
+  } finally {
+    await provider.close?.();
   }
 
   logger?.info("Applied pending action", {

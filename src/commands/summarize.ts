@@ -5,6 +5,7 @@ import { Command } from "commander";
 import { buildSummarizePrompt } from "../codex/prompts.js";
 import { runWorkflow } from "../codex/runner.js";
 import { readLocalDocument } from "../documents/local.js";
+import { canUseDriveTools } from "../google/provider.js";
 import { createRuntimeContext } from "../runtime.js";
 import type { DocumentSummaryResult } from "../types/results.js";
 import { assertWorkspaceReady, printJson } from "./utils.js";
@@ -17,8 +18,15 @@ export function registerSummarizeCommand(program: Command): void {
     .action(async (target: string) => {
       const context = createRuntimeContext();
       await assertWorkspaceReady(context.config);
+      const isLocalFile = fs.existsSync(target);
 
-      const prompt = fs.existsSync(target)
+      if (!isLocalFile && !canUseDriveTools(context.config)) {
+        throw new Error(
+          "Drive search requires OAuth mode in this version. Set `google.mode` to `oauth` or configure OAuth credentials and tokens for Drive access.",
+        );
+      }
+
+      const prompt = isLocalFile
         ? buildSummarizePrompt(context.config, {
             kind: "local-document",
             ...(await readLocalDocument(target)),

@@ -31,7 +31,8 @@ Real external writes happen only when you run `deskpilot actions apply <id>`.
 - Node.js 20 or later
 - `codex` on your `PATH`
 - A Codex login already active on the machine
-- Google OAuth client credentials for Gmail, Calendar, and Drive access
+- Google Chrome available locally for browser-backed Gmail and Calendar access
+- Google OAuth client credentials only if you want OAuth mode or Drive access
 
 This repo was built and verified with:
 
@@ -54,14 +55,22 @@ node dist/cli.js --help
 
 You can also symlink or install it however you normally manage local Node CLIs.
 
-## Google OAuth Configuration
+## Google Configuration
 
-DeskPilot reads Google OAuth client configuration from either environment variables
-or `~/.deskpilot/config.json`.
+DeskPilot defaults to browser mode for Gmail and Calendar. It launches a dedicated
+Chrome profile under `~/.deskpilot/browser/google-chrome`, and you sign into Google
+there with `deskpilot auth google`.
+
+Drive is still OAuth-backed in this version. If you want Drive tools, or if you prefer
+the original API-backed Google integration, configure OAuth credentials and switch
+`google.mode` to `oauth`.
 
 ### Environment variables
 
 ```bash
+export DESKPILOT_GOOGLE_MODE="browser"
+export DESKPILOT_GOOGLE_BROWSER_PATH="/usr/bin/google-chrome-stable"
+export DESKPILOT_GOOGLE_BROWSER_PROFILE_DIR="$HOME/.deskpilot/browser/google-chrome"
 export DESKPILOT_GOOGLE_CLIENT_ID="your-google-client-id"
 export DESKPILOT_GOOGLE_CLIENT_SECRET="your-google-client-secret"
 export DESKPILOT_GOOGLE_REDIRECT_PORT="8765"
@@ -75,12 +84,22 @@ export DESKPILOT_GOOGLE_REDIRECT_PORT="8765"
 {
   "model": "gpt-5.4",
   "google": {
-    "clientId": "your-google-client-id",
-    "clientSecret": "your-google-client-secret",
-    "redirectPort": 8765
+    "mode": "browser",
+    "browser": {
+      "executablePath": "/usr/bin/google-chrome-stable",
+      "profileDir": "/home/you/.deskpilot/browser/google-chrome"
+    },
+    "oauth": {
+      "clientId": "your-google-client-id",
+      "clientSecret": "your-google-client-secret",
+      "redirectPort": 8765
+    }
   }
 }
 ```
+
+Legacy flat OAuth keys under `google.clientId`, `google.clientSecret`, and
+`google.redirectPort` are still supported for backward compatibility.
 
 ## First-Time Setup
 
@@ -94,6 +113,7 @@ This will:
 
 - verify `codex` is installed
 - verify Codex is logged in
+- verify Chrome is available for browser mode
 - create `~/.deskpilot/{runtime,logs}`
 - initialize `~/.deskpilot/state.db`
 - copy runtime instructions to `~/.deskpilot/runtime/AGENTS.md`
@@ -105,13 +125,22 @@ Then authenticate against Google:
 node dist/cli.js auth google
 ```
 
-Tokens are stored at:
+This opens the dedicated DeskPilot Chrome profile and waits for Gmail and Calendar
+to become available in that browser session.
+
+If you want the legacy OAuth flow instead:
+
+```bash
+node dist/cli.js auth google --provider oauth
+```
+
+OAuth tokens are stored at:
 
 ```text
 ~/.deskpilot/google-oauth.json
 ```
 
-with `0600` permissions.
+with `0600` permissions when OAuth is used.
 
 ## Commands
 
@@ -125,6 +154,9 @@ node dist/cli.js schedule "Find 30 minutes with finance next week to review the 
 node dist/cli.js summarize ./notes/meeting.txt
 node dist/cli.js summarize "name contains 'Q2 Plan' and trashed = false"
 ```
+
+In browser mode without OAuth tokens, Drive query summarization is unavailable and
+DeskPilot will tell you to switch to OAuth mode or configure OAuth tokens for Drive.
 
 ### Actions
 
@@ -148,6 +180,8 @@ DeskPilot stores its local state under `~/.deskpilot`:
 ```text
 ~/.deskpilot/
   config.json
+  browser/
+    google-chrome/
   google-oauth.json
   state.db
   runtime/
@@ -160,6 +194,7 @@ Key behavior:
 
 - SQLite state lives in `~/.deskpilot/state.db`
 - Logs stay local in `~/.deskpilot/logs/deskpilot.log`
+- Browser-mode Google auth lives in the dedicated Chrome profile under `~/.deskpilot/browser/google-chrome`
 - The Codex runtime workspace is `~/.deskpilot/runtime`
 - One resumable Codex session is maintained per workflow:
   - `chat`
@@ -172,6 +207,7 @@ Key behavior:
 
 - Gmail writes are draft-only in Codex workflows
 - Calendar writes are stage-only in Codex workflows
+- Gmail thread IDs, Calendar event IDs, and applied action external IDs are opaque provider-native references
 - `deskpilot actions apply <id>` is the only path that actually creates external artifacts
 - `deskpilot actions apply <id>` always asks for explicit confirmation
 - Follow-up extraction is local-only and safe to persist automatically

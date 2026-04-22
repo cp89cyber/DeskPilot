@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { execa } from "execa";
 
+import { resolveChromeExecutablePath } from "./google/browser/session.js";
 import type { DeskPilotConfig } from "./types/config.js";
 
 export function workspaceServerScriptPath(config: DeskPilotConfig): string {
@@ -75,4 +76,18 @@ export async function registerWorkspaceMcpServer(config: DeskPilotConfig): Promi
   if (result.exitCode !== 0) {
     throw new Error(`Failed to register MCP server:\n${result.stderr || result.stdout}`);
   }
+}
+
+export function resolvedGoogleBrowserDetails(config: DeskPilotConfig): {
+  executablePath: string;
+  profileDir: string;
+} {
+  return {
+    executablePath: resolveChromeExecutablePath(config),
+    profileDir: config.googleBrowser.profileDir,
+  };
+}
+
+export function ensureGoogleBrowserAvailable(config: DeskPilotConfig): void {
+  resolvedGoogleBrowserDetails(config);
 }

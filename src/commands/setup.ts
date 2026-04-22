@@ -7,9 +7,11 @@ import { ensureDeskPilotDirectories, templatePath } from "../config.js";
 import {
   ensureCodexInstalled,
   ensureCodexLoggedIn,
+  ensureGoogleBrowserAvailable,
   ensureWorkspaceMcpRegistered,
   ensureWorkspaceServerBuilt,
   registerWorkspaceMcpServer,
+  resolvedGoogleBrowserDetails,
 } from "../prereqs.js";
 import { createRuntimeContext } from "../runtime.js";
 
@@ -25,6 +27,16 @@ export function registerSetupCommand(program: Command): void {
       await ensureCodexInstalled(config);
       await ensureCodexLoggedIn(config);
       await ensureWorkspaceServerBuilt(config);
+      let browser:
+        | {
+            executablePath: string;
+            profileDir: string;
+          }
+        | undefined;
+      if (config.googleMode === "browser") {
+        ensureGoogleBrowserAvailable(config);
+        browser = resolvedGoogleBrowserDetails(config);
+      }
 
       const runtimeAgentsSource = templatePath(config, path.join("templates", "runtime-AGENTS.md"));
       const runtimeAgentsTarget = path.join(config.runtimeDir, "AGENTS.md");
@@ -39,6 +51,11 @@ export function registerSetupCommand(program: Command): void {
       console.log("DeskPilot setup complete.");
       console.log(`Home: ${config.deskpilotHome}`);
       console.log(`Runtime instructions: ${runtimeAgentsTarget}`);
+      console.log(`Google mode: ${config.googleMode}`);
+      if (browser) {
+        console.log(`Chrome: ${browser.executablePath}`);
+        console.log(`Browser profile: ${browser.profileDir}`);
+      }
       console.log(
         alreadyRegistered
           ? `MCP server '${config.mcpServerName}' already registered.`

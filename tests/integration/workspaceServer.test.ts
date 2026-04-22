@@ -19,6 +19,12 @@ describe("workspace MCP server", () => {
 
   it("exposes read and stage tools through MCP", async () => {
     const server = createWorkspaceServer({
+      capabilities: {
+        mode: "oauth",
+        gmail: true,
+        calendar: true,
+        drive: true,
+      },
       gmail: {
         async listThreads() {
           return [
@@ -168,5 +174,80 @@ describe("workspace MCP server", () => {
       expect(stageText.text).toContain("action-1");
       expect(stageText.text).toContain("thread:thread-1");
     }
+  });
+
+  it("omits Drive tools when Drive is unavailable", async () => {
+    const server = createWorkspaceServer({
+      capabilities: {
+        mode: "browser",
+        gmail: true,
+        calendar: true,
+        drive: false,
+      },
+      gmail: {
+        async listThreads() {
+          return [];
+        },
+        async getThread(threadId: string) {
+          return {
+            threadId,
+            snippet: "",
+            messages: [],
+          };
+        },
+      },
+      calendar: {
+        async listEvents() {
+          return [];
+        },
+        async findAvailability() {
+          return [];
+        },
+      },
+      followups: {
+        async list() {
+          return [];
+        },
+      },
+      stage: {
+        async gmailDraft(payload, sourceRefs) {
+          return {
+            id: "action-1",
+            kind: "gmail_draft",
+            status: "staged",
+            previewMarkdown: payload.subject,
+            payloadJson: JSON.stringify(payload),
+            sourceRefs,
+            createdAt: "2026-04-22T10:06:00.000Z",
+          };
+        },
+        async calendarEvent(payload, sourceRefs) {
+          return {
+            id: "action-2",
+            kind: "calendar_event",
+            status: "staged",
+            previewMarkdown: payload.summary,
+            payloadJson: JSON.stringify(payload),
+            sourceRefs,
+            createdAt: "2026-04-22T10:06:00.000Z",
+          };
+        },
+      },
+    });
+
+    servers.push(server);
+
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "deskpilot-test-client", version: "0.1.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const tools = await client.listTools();
+    const toolNames = tools.tools.map((tool) => tool.name);
+
+    expect(toolNames).toContain("gmail_list_threads");
+    expect(toolNames).toContain("calendar_list_events");
+    expect(toolNames).not.toContain("drive_search");
+    expect(toolNames).not.toContain("drive_get_file");
   });
 });

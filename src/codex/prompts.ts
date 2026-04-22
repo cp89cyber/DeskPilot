@@ -23,10 +23,19 @@ export function buildInboxPrompt(config: DeskPilotConfig, query: string): string
   );
 }
 
-export function buildBriefPrompt(config: DeskPilotConfig, todayIsoDate: string): string {
+export function buildBriefPrompt(
+  config: DeskPilotConfig,
+  todayIsoDate: string,
+  options?: { driveToolsAvailable?: boolean },
+): string {
+  const driveAvailabilityNote = options?.driveToolsAvailable === false
+    ? "Drive tools are unavailable in this run. Do not ask for Drive content or cite Drive files."
+    : "";
+
   return joinSections(
     readPrompt(config, "system.md"),
     readPrompt(config, "brief-today.md"),
+    driveAvailabilityNote,
     `Date to brief: ${todayIsoDate}`,
   );
 }

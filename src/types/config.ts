@@ -1,14 +1,28 @@
 export type CodexWorkflow = "chat" | "inbox" | "brief" | "schedule" | "summarize";
 
-export interface GoogleCredentials {
+export type GoogleMode = "browser" | "oauth";
+
+export interface GoogleOAuthCredentials {
   clientId: string;
   clientSecret: string;
   redirectPort: number;
 }
 
+export interface GoogleBrowserConfig {
+  executablePath?: string;
+  profileDir: string;
+}
+
 export interface DeskPilotConfigFile {
   model?: string;
-  google?: Partial<GoogleCredentials>;
+  google?: {
+    mode?: GoogleMode;
+    browser?: Partial<GoogleBrowserConfig>;
+    oauth?: Partial<GoogleOAuthCredentials>;
+    clientId?: string;
+    clientSecret?: string;
+    redirectPort?: number;
+  };
 }
 
 export interface DeskPilotConfig {
@@ -22,7 +36,9 @@ export interface DeskPilotConfig {
   model: string;
   codexBinary: string;
   mcpServerName: string;
-  googleCredentials?: GoogleCredentials;
+  googleMode: GoogleMode;
+  googleBrowser: GoogleBrowserConfig;
+  googleOAuthCredentials?: GoogleOAuthCredentials;
 }
 
 export interface DeskPilotSession {

@@ -6,12 +6,15 @@ import { fileURLToPath } from "node:url";
 import type {
   DeskPilotConfig,
   DeskPilotConfigFile,
-  GoogleCredentials,
+  GoogleBrowserConfig,
+  GoogleMode,
+  GoogleOAuthCredentials,
 } from "./types/config.js";
 
 const DEFAULT_MODEL = "gpt-5.4";
 const DEFAULT_MCP_SERVER_NAME = "deskpilot-workspace";
 const DEFAULT_GOOGLE_REDIRECT_PORT = 8765;
+const DEFAULT_GOOGLE_MODE: GoogleMode = "browser";
 
 function findRepoRoot(): string {
   const currentDir = fileURLToPath(new URL(".", import.meta.url));
@@ -39,17 +42,31 @@ function readConfigFile(configFilePath: string): DeskPilotConfigFile {
   return JSON.parse(raw) as DeskPilotConfigFile;
 }
 
-function resolveGoogleCredentials(configFile: DeskPilotConfigFile): GoogleCredentials | undefined {
+function resolveGoogleMode(configFile: DeskPilotConfigFile): GoogleMode {
+  const raw =
+    process.env.DESKPILOT_GOOGLE_MODE ??
+    configFile.google?.mode ??
+    DEFAULT_GOOGLE_MODE;
+
+  return raw === "oauth" ? "oauth" : "browser";
+}
+
+function resolveGoogleOAuthCredentials(
+  configFile: DeskPilotConfigFile,
+): GoogleOAuthCredentials | undefined {
   const clientId =
     process.env.DESKPILOT_GOOGLE_CLIENT_ID ??
     process.env.GOOGLE_CLIENT_ID ??
+    configFile.google?.oauth?.clientId ??
     configFile.google?.clientId;
   const clientSecret =
     process.env.DESKPILOT_GOOGLE_CLIENT_SECRET ??
     process.env.GOOGLE_CLIENT_SECRET ??
+    configFile.google?.oauth?.clientSecret ??
     configFile.google?.clientSecret;
   const redirectPortRaw =
     process.env.DESKPILOT_GOOGLE_REDIRECT_PORT ??
+    configFile.google?.oauth?.redirectPort?.toString() ??
     configFile.google?.redirectPort?.toString();
   const redirectPort = Number.parseInt(
     redirectPortRaw ?? String(DEFAULT_GOOGLE_REDIRECT_PORT),
@@ -63,7 +80,22 @@ function resolveGoogleCredentials(configFile: DeskPilotConfigFile): GoogleCreden
   return {
     clientId,
     clientSecret,
-    redirectPort: Number.isNaN(redirectPort) ? DEFAULT_GOOGLE_REDIRECT_PORT : redirectPort,
+      redirectPort: Number.isNaN(redirectPort) ? DEFAULT_GOOGLE_REDIRECT_PORT : redirectPort,
+  };
+}
+
+function resolveGoogleBrowserConfig(
+  deskpilotHome: string,
+  configFile: DeskPilotConfigFile,
+): GoogleBrowserConfig {
+  return {
+    executablePath:
+      process.env.DESKPILOT_GOOGLE_BROWSER_PATH ??
+      configFile.google?.browser?.executablePath,
+    profileDir:
+      process.env.DESKPILOT_GOOGLE_BROWSER_PROFILE_DIR ??
+      configFile.google?.browser?.profileDir ??
+      path.join(deskpilotHome, "browser", "google-chrome"),
   };
 }
 
@@ -73,7 +105,9 @@ export function loadDeskPilotConfig(): DeskPilotConfig {
     process.env.DESKPILOT_HOME ?? path.join(os.homedir(), ".deskpilot");
   const configFilePath = path.join(deskpilotHome, "config.json");
   const configFile = readConfigFile(configFilePath);
-  const googleCredentials = resolveGoogleCredentials(configFile);
+  const googleMode = resolveGoogleMode(configFile);
+  const googleBrowser = resolveGoogleBrowserConfig(deskpilotHome, configFile);
+  const googleOAuthCredentials = resolveGoogleOAuthCredentials(configFile);
 
   return {
     repoRoot,
@@ -86,7 +120,9 @@ export function loadDeskPilotConfig(): DeskPilotConfig {
     model: process.env.DESKPILOT_MODEL ?? configFile.model ?? DEFAULT_MODEL,
     codexBinary: process.env.DESKPILOT_CODEX_BIN ?? "codex",
     mcpServerName: DEFAULT_MCP_SERVER_NAME,
-    googleCredentials,
+    googleMode,
+    googleBrowser,
+    googleOAuthCredentials,
   };
 }
 
@@ -94,6 +130,7 @@ export function ensureDeskPilotDirectories(config: DeskPilotConfig): void {
   fs.mkdirSync(config.deskpilotHome, { recursive: true });
   fs.mkdirSync(config.runtimeDir, { recursive: true });
   fs.mkdirSync(config.logsDir, { recursive: true });
+  fs.mkdirSync(config.googleBrowser.profileDir, { recursive: true });
 }
 
 export function templatePath(config: DeskPilotConfig, relativePath: string): string {

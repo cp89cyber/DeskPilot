@@ -25,12 +25,12 @@ const GOOGLE_SCOPES = [
 ];
 
 function requireCredentials(config: DeskPilotConfig) {
-  if (!config.googleCredentials) {
+  if (!config.googleOAuthCredentials) {
     throw new Error(
       `Google OAuth credentials are missing. Set DESKPILOT_GOOGLE_CLIENT_ID and DESKPILOT_GOOGLE_CLIENT_SECRET, or write them to ${config.configFilePath}.`,
     );
   }
-  return config.googleCredentials;
+  return config.googleOAuthCredentials;
 }
 
 function redirectUriForPort(port: number): string {

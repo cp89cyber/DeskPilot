@@ -2,6 +2,7 @@ import { Command } from "commander";
 
 import { buildBriefPrompt } from "../codex/prompts.js";
 import { runWorkflow } from "../codex/runner.js";
+import { canUseDriveTools } from "../google/provider.js";
 import { createRuntimeContext } from "../runtime.js";
 import type { DailyBriefResult } from "../types/results.js";
 import { assertWorkspaceReady, printJson } from "./utils.js";
@@ -22,7 +23,9 @@ export function registerBriefCommand(program: Command): void {
         context.repositories,
         {
           workflow: "brief",
-          prompt: buildBriefPrompt(context.config, today),
+          prompt: buildBriefPrompt(context.config, today, {
+            driveToolsAvailable: canUseDriveTools(context.config),
+          }),
         },
         context.logger,
       );

@@ -8,9 +8,6 @@ import { z } from "zod";
 
 import { stageCalendarEvent, stageGmailDraft } from "../actions/staging.js";
 import { ensureDeskPilotDirectories, loadDeskPilotConfig } from "../config.js";
-import { findCalendarAvailability, listCalendarEvents } from "../google/calendar.js";
-import { getDriveFile, searchDriveFiles, type DriveFileContent, type DriveFileSummary } from "../google/drive.js";
-import { getGmailThread, listGmailThreads, type GmailThreadDetail, type GmailThreadSummary } from "../google/gmail.js";
 import { createLogger } from "../logger.js";
 import { openDatabase } from "../storage/db.js";
 import {
@@ -18,16 +15,23 @@ import {
   type DeskPilotRepositories,
 } from "../storage/repositories.js";
 import type { AvailabilitySlot, CalendarEventSummary } from "../google/calendar.js";
+import type { DriveFileContent, DriveFileSummary } from "../google/drive.js";
+import type { GmailThreadDetail, GmailThreadSummary } from "../google/gmail.js";
+import {
+  createGoogleWorkspaceProvider,
+  type GoogleWorkspaceCapabilities,
+  type GoogleWorkspaceProvider,
+} from "../google/provider.js";
 import type { CalendarEventPayload, GmailDraftPayload, PendingAction } from "../types/actions.js";
 import type { FollowupItem } from "../types/results.js";
-import type { DeskPilotConfig } from "../types/config.js";
 
 interface WorkspaceServices {
-  gmail: {
+  capabilities: GoogleWorkspaceCapabilities;
+  gmail?: {
     listThreads(args: { query?: string; maxResults?: number }): Promise<GmailThreadSummary[]>;
     getThread(threadId: string): Promise<GmailThreadDetail>;
   };
-  calendar: {
+  calendar?: {
     listEvents(args: { timeMin?: string; timeMax?: string; maxResults?: number }): Promise<CalendarEventSummary[]>;
     findAvailability(args: {
       durationMinutes: number;
@@ -36,7 +40,7 @@ interface WorkspaceServices {
       limit?: number;
     }): Promise<AvailabilitySlot[]>;
   };
-  drive: {
+  drive?: {
     search(args: { query: string; maxResults?: number }): Promise<DriveFileSummary[]>;
     getFile(fileId: string): Promise<DriveFileContent>;
   };
@@ -62,40 +66,41 @@ function jsonContent<T extends object>(structuredContent: T) {
 }
 
 function createWorkspaceServices(
-  config: DeskPilotConfig,
+  provider: GoogleWorkspaceProvider,
   repositories: DeskPilotRepositories,
 ): WorkspaceServices {
   return {
-    gmail: {
-      async listThreads(args) {
-        return await listGmailThreads(config, {
-          query: args.query,
-          maxResults: args.maxResults,
-        });
-      },
-      async getThread(threadId) {
-        return await getGmailThread(config, threadId);
-      },
-    },
-    calendar: {
-      async listEvents(args) {
-        return await listCalendarEvents(config, args);
-      },
-      async findAvailability(args) {
-        return await findCalendarAvailability(config, args);
-      },
-    },
-    drive: {
-      async search(args) {
-        return await searchDriveFiles(config, {
-          query: args.query,
-          pageSize: args.maxResults,
-        });
-      },
-      async getFile(fileId) {
-        return await getDriveFile(config, repositories.cache, fileId);
-      },
-    },
+    capabilities: provider.capabilities,
+    gmail: provider.gmail
+      ? {
+          async listThreads(args) {
+            return await provider.gmail!.listThreads(args);
+          },
+          async getThread(threadId) {
+            return await provider.gmail!.getThread(threadId);
+          },
+        }
+      : undefined,
+    calendar: provider.calendar
+      ? {
+          async listEvents(args) {
+            return await provider.calendar!.listEvents(args);
+          },
+          async findAvailability(args) {
+            return await provider.calendar!.findAvailability(args);
+          },
+        }
+      : undefined,
+    drive: provider.drive
+      ? {
+          async search(args) {
+            return await provider.drive!.search(args);
+          },
+          async getFile(fileId) {
+            return await provider.drive!.getFile(fileId);
+          },
+        }
+      : undefined,
     followups: {
       async list(status) {
         return repositories.followups.list(status);
@@ -118,104 +123,110 @@ export function createWorkspaceServer(services: WorkspaceServices): McpServer {
     version: "0.1.0",
   });
 
-  server.registerTool(
-    "gmail_list_threads",
-    {
-      description: "List Gmail threads for the authenticated DeskPilot user.",
-      inputSchema: {
-        query: z.string().optional(),
-        maxResults: z.number().int().min(1).max(50).optional(),
+  if (services.gmail) {
+    server.registerTool(
+      "gmail_list_threads",
+      {
+        description: "List Gmail threads for the authenticated DeskPilot user.",
+        inputSchema: {
+          query: z.string().optional(),
+          maxResults: z.number().int().min(1).max(50).optional(),
+        },
       },
-    },
-    async ({ query, maxResults }) => {
-      const threads = await services.gmail.listThreads({ query, maxResults });
-      return jsonContent({ threads });
-    },
-  );
+      async ({ query, maxResults }) => {
+        const threads = await services.gmail!.listThreads({ query, maxResults });
+        return jsonContent({ threads });
+      },
+    );
 
-  server.registerTool(
-    "gmail_get_thread",
-    {
-      description: "Get the full contents of a Gmail thread by ID.",
-      inputSchema: {
-        threadId: z.string(),
+    server.registerTool(
+      "gmail_get_thread",
+      {
+        description: "Get the full contents of a Gmail thread by ID.",
+        inputSchema: {
+          threadId: z.string(),
+        },
       },
-    },
-    async ({ threadId }) => {
-      const thread = await services.gmail.getThread(threadId);
-      return jsonContent({
-        ...thread,
-        messages: thread.messages.map((message) => ({ ...message })),
-      });
-    },
-  );
+      async ({ threadId }) => {
+        const thread = await services.gmail!.getThread(threadId);
+        return jsonContent({
+          ...thread,
+          messages: thread.messages.map((message) => ({ ...message })),
+        });
+      },
+    );
+  }
 
-  server.registerTool(
-    "calendar_list_events",
-    {
-      description: "List events on the user's primary Google Calendar.",
-      inputSchema: {
-        timeMin: z.string().optional(),
-        timeMax: z.string().optional(),
-        maxResults: z.number().int().min(1).max(100).optional(),
+  if (services.calendar) {
+    server.registerTool(
+      "calendar_list_events",
+      {
+        description: "List events on the user's primary Google Calendar.",
+        inputSchema: {
+          timeMin: z.string().optional(),
+          timeMax: z.string().optional(),
+          maxResults: z.number().int().min(1).max(100).optional(),
+        },
       },
-    },
-    async ({ timeMin, timeMax, maxResults }) => {
-      const events = await services.calendar.listEvents({ timeMin, timeMax, maxResults });
-      return jsonContent({ events });
-    },
-  );
+      async ({ timeMin, timeMax, maxResults }) => {
+        const events = await services.calendar!.listEvents({ timeMin, timeMax, maxResults });
+        return jsonContent({ events });
+      },
+    );
 
-  server.registerTool(
-    "calendar_find_availability",
-    {
-      description: "Find open time slots on the user's calendar.",
-      inputSchema: {
-        durationMinutes: z.number().int().positive(),
-        timeMin: z.string().optional(),
-        timeMax: z.string().optional(),
-        limit: z.number().int().min(1).max(10).optional(),
+    server.registerTool(
+      "calendar_find_availability",
+      {
+        description: "Find open time slots on the user's calendar.",
+        inputSchema: {
+          durationMinutes: z.number().int().positive(),
+          timeMin: z.string().optional(),
+          timeMax: z.string().optional(),
+          limit: z.number().int().min(1).max(10).optional(),
+        },
       },
-    },
-    async ({ durationMinutes, timeMin, timeMax, limit }) => {
-      const slots = await services.calendar.findAvailability({
-        durationMinutes,
-        timeMin,
-        timeMax,
-        limit,
-      });
-      return jsonContent({ slots });
-    },
-  );
+      async ({ durationMinutes, timeMin, timeMax, limit }) => {
+        const slots = await services.calendar!.findAvailability({
+          durationMinutes,
+          timeMin,
+          timeMax,
+          limit,
+        });
+        return jsonContent({ slots });
+      },
+    );
+  }
 
-  server.registerTool(
-    "drive_search",
-    {
-      description: "Search Google Drive files by query string.",
-      inputSchema: {
-        query: z.string(),
-        maxResults: z.number().int().min(1).max(20).optional(),
+  if (services.drive) {
+    server.registerTool(
+      "drive_search",
+      {
+        description: "Search Google Drive files by query string.",
+        inputSchema: {
+          query: z.string(),
+          maxResults: z.number().int().min(1).max(20).optional(),
+        },
       },
-    },
-    async ({ query, maxResults }) => {
-      const files = await services.drive.search({ query, maxResults });
-      return jsonContent({ files });
-    },
-  );
+      async ({ query, maxResults }) => {
+        const files = await services.drive!.search({ query, maxResults });
+        return jsonContent({ files });
+      },
+    );
 
-  server.registerTool(
-    "drive_get_file",
-    {
-      description: "Download and normalize a Drive file by ID.",
-      inputSchema: {
-        fileId: z.string(),
+    server.registerTool(
+      "drive_get_file",
+      {
+        description: "Download and normalize a Drive file by ID.",
+        inputSchema: {
+          fileId: z.string(),
+        },
       },
-    },
-    async ({ fileId }) => {
-      const file = await services.drive.getFile(fileId);
-      return jsonContent({ ...file });
-    },
-  );
+      async ({ fileId }) => {
+        const file = await services.drive!.getFile(fileId);
+        return jsonContent({ ...file });
+      },
+    );
+  }
 
   server.registerTool(
     "followups_list",
@@ -296,12 +307,30 @@ async function main(): Promise<void> {
   const logger = createLogger(config);
   const db = openDatabase(config);
   const repositories = createRepositories(db);
-  const server = createWorkspaceServer(createWorkspaceServices(config, repositories));
+  const provider = createGoogleWorkspaceProvider(config, {
+    cacheRepository: repositories.cache,
+  });
+  const server = createWorkspaceServer(createWorkspaceServices(provider, repositories));
   const transport = new StdioServerTransport();
+  const shutdown = async () => {
+    await provider.close?.().catch(() => undefined);
+  };
 
-  await server.connect(transport);
-  logger.info("DeskPilot MCP server started");
-  console.error("DeskPilot MCP server running on stdio");
+  process.once("SIGINT", () => {
+    void shutdown().finally(() => process.exit(0));
+  });
+  process.once("SIGTERM", () => {
+    void shutdown().finally(() => process.exit(0));
+  });
+
+  try {
+    await server.connect(transport);
+    logger.info("DeskPilot MCP server started");
+    console.error("DeskPilot MCP server running on stdio");
+  } catch (error) {
+    await shutdown();
+    throw error;
+  }
 }
 
 const currentFile = fileURLToPath(import.meta.url);
