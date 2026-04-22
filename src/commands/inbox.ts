@@ -12,7 +12,7 @@ export function registerInboxCommand(program: Command): void {
     .description("Triage inbox threads and stage draft replies when useful.")
     .option("--query <query>", "Gmail search query", "in:inbox newer_than:7d")
     .action(async (options: { query: string }) => {
-      const context = createRuntimeContext();
+      const context = await createRuntimeContext();
       await assertWorkspaceReady(context.config);
 
       const result = await runWorkflow(

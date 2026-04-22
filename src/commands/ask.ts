@@ -11,7 +11,7 @@ export function registerAskCommand(program: Command): void {
     .description("Run an ad-hoc office-work prompt through the DeskPilot Codex session.")
     .argument("<prompt>", "The prompt to send to DeskPilot.")
     .action(async (prompt: string) => {
-      const context = createRuntimeContext();
+      const context = await createRuntimeContext();
       await assertWorkspaceReady(context.config);
 
       const result = await runWorkflow(

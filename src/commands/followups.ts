@@ -10,8 +10,8 @@ export function registerFollowupsCommand(program: Command): void {
     .command("list")
     .description("List follow-up items.")
     .option("--status <status>", "Optional status filter")
-    .action((options: { status?: string }) => {
-      const context = createRuntimeContext();
+    .action(async (options: { status?: string }) => {
+      const context = await createRuntimeContext();
       printJson(context.repositories.followups.list(options.status));
     });
 
@@ -19,8 +19,8 @@ export function registerFollowupsCommand(program: Command): void {
     .command("complete")
     .description("Mark a follow-up item as completed.")
     .argument("<id>", "Follow-up ID")
-    .action((id: string) => {
-      const context = createRuntimeContext();
+    .action(async (id: string) => {
+      const context = await createRuntimeContext();
       const item = context.repositories.followups.complete(id);
       if (!item) {
         throw new Error(`Unknown follow-up ID: ${id}`);

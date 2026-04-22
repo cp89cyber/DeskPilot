@@ -13,14 +13,14 @@ import {
   registerWorkspaceMcpServer,
   resolvedGoogleBrowserDetails,
 } from "../prereqs.js";
-import { createRuntimeContext } from "../runtime.js";
+import { createBaseContext } from "../runtime.js";
 
 export function registerSetupCommand(program: Command): void {
   program
     .command("setup")
     .description("Initialize DeskPilot home directories and register the local MCP server.")
     .action(async () => {
-      const context = createRuntimeContext();
+      const context = createBaseContext();
       const { config, logger } = context;
 
       ensureDeskPilotDirectories(config);

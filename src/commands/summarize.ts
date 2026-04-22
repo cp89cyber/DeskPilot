@@ -16,7 +16,7 @@ export function registerSummarizeCommand(program: Command): void {
     .description("Summarize a local document or a Google Drive file query.")
     .argument("<target>", "Local file path or Drive search query")
     .action(async (target: string) => {
-      const context = createRuntimeContext();
+      const context = await createRuntimeContext();
       await assertWorkspaceReady(context.config);
       const isLocalFile = fs.existsSync(target);
 

@@ -14,7 +14,7 @@ export function registerBriefCommand(program: Command): void {
     .command("today")
     .description("Create a daily brief using today's meetings, inbox context, and follow-ups.")
     .action(async () => {
-      const context = createRuntimeContext();
+      const context = await createRuntimeContext();
       await assertWorkspaceReady(context.config);
       const today = new Date().toISOString().slice(0, 10);
 

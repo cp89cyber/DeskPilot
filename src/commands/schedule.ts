@@ -12,7 +12,7 @@ export function registerScheduleCommand(program: Command): void {
     .description("Plan a meeting, propose slots, and optionally stage an event.")
     .argument("<request>", "Natural-language scheduling request")
     .action(async (request: string) => {
-      const context = createRuntimeContext();
+      const context = await createRuntimeContext();
       await assertWorkspaceReady(context.config);
 
       const result = await runWorkflow(

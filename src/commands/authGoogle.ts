@@ -6,7 +6,7 @@ import {
   browserAuthTargets,
   ensureBrowserGoogleAuthenticated,
 } from "../google/browser/session.js";
-import { createRuntimeContext } from "../runtime.js";
+import { createBaseContext } from "../runtime.js";
 
 export function registerAuthCommand(program: Command): void {
   const auth = program.command("auth").description("Authentication workflows.");
@@ -16,7 +16,7 @@ export function registerAuthCommand(program: Command): void {
     .description("Authenticate DeskPilot against Google via browser mode or OAuth.")
     .option("--provider <provider>", "Authentication provider (browser or oauth)", "browser")
     .action(async (options: { provider: string }) => {
-      const context = createRuntimeContext();
+      const context = createBaseContext();
       if (!["browser", "oauth"].includes(options.provider)) {
         throw new Error(
           `Unsupported Google auth provider: ${options.provider}. Use \`browser\` or \`oauth\`.`,

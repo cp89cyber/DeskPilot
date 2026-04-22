@@ -10,8 +10,8 @@ export function registerActionsCommand(program: Command): void {
   actions
     .command("list")
     .description("List staged and applied actions.")
-    .action(() => {
-      const context = createRuntimeContext();
+    .action(async () => {
+      const context = await createRuntimeContext();
       const items = context.repositories.pendingActions.list().map((action) => ({
         ...action,
         payload: JSON.parse(action.payloadJson) as unknown,
@@ -23,8 +23,8 @@ export function registerActionsCommand(program: Command): void {
     .command("show")
     .description("Show a staged action by ID.")
     .argument("<id>", "Action ID")
-    .action((id: string) => {
-      const context = createRuntimeContext();
+    .action(async (id: string) => {
+      const context = await createRuntimeContext();
       const action = context.repositories.pendingActions.get(id);
       if (!action) {
         throw new Error(`Unknown action ID: ${id}`);
@@ -41,7 +41,7 @@ export function registerActionsCommand(program: Command): void {
     .description("Apply a staged action after explicit confirmation.")
     .argument("<id>", "Action ID")
     .action(async (id: string) => {
-      const context = createRuntimeContext();
+      const context = await createRuntimeContext();
       const action = context.repositories.pendingActions.get(id);
       if (!action) {
         throw new Error(`Unknown action ID: ${id}`);
