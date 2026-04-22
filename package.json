@@ -1,0 +1,35 @@
+{
+  "name": "deskpilot",
+  "version": "0.1.0",
+  "description": "A Codex-CLI-based office agent for Gmail, Calendar, and Drive workflows.",
+  "type": "module",
+  "bin": {
+    "deskpilot": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^12.9.0",
+    "commander": "^14.0.3",
+    "execa": "^9.6.1",
+    "googleapis": "^171.4.0",
+    "pdf-parse": "^1.1.1",
+    "playwright-core": "^1.59.1",
+    "zod": "^4.3.6",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.5"
+  }
+}

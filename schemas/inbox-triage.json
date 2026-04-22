@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "overview",
+    "urgentThreads",
+    "replyRecommendations",
+    "followUps",
+    "stagedActionIds",
+    "sourceRefs"
+  ],
+  "properties": {
+    "overview": {
+      "type": "string"
+    },
+    "urgentThreads": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "threadId",
+          "subject",
+          "reason"
+        ],
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "replyRecommendations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "threadId",
+          "recommendation"
+        ],
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "recommendation": {
+            "type": "string"
+          },
+          "stagedActionId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "followUps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "status",
+          "sourceRefs"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "dueAt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "sourceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "stagedActionIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sourceRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
