@@ -7,13 +7,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import { stageCalendarEvent, stageGmailDraft } from "../actions/staging.js";
-import { ensureDeskPilotDirectories, loadDeskPilotConfig } from "../config.js";
-import { createLogger } from "../logger.js";
-import { openDatabase } from "../storage/db.js";
-import {
-  createRepositories,
-  type DeskPilotRepositories,
-} from "../storage/repositories.js";
 import type { AvailabilitySlot, CalendarEventSummary } from "../google/calendar.js";
 import type { DriveFileContent, DriveFileSummary } from "../google/drive.js";
 import type { GmailThreadDetail, GmailThreadSummary } from "../google/gmail.js";
@@ -22,6 +15,9 @@ import {
   type GoogleWorkspaceCapabilities,
   type GoogleWorkspaceProvider,
 } from "../google/provider.js";
+import { createBaseContext } from "../runtime.js";
+import { initializeStorage } from "../storage/bootstrap.js";
+import type { DeskPilotRepositories } from "../storage/repositories.js";
 import type { CalendarEventPayload, GmailDraftPayload, PendingAction } from "../types/actions.js";
 import type { FollowupItem } from "../types/results.js";
 
@@ -302,18 +298,20 @@ export function createWorkspaceServer(services: WorkspaceServices): McpServer {
 }
 
 async function main(): Promise<void> {
-  const config = loadDeskPilotConfig();
-  ensureDeskPilotDirectories(config);
-  const logger = createLogger(config);
-  const db = openDatabase(config);
-  const repositories = createRepositories(db);
+  const { config, logger } = createBaseContext();
+  const { db, repositories } = await initializeStorage(config);
   const provider = createGoogleWorkspaceProvider(config, {
     cacheRepository: repositories.cache,
   });
   const server = createWorkspaceServer(createWorkspaceServices(provider, repositories));
   const transport = new StdioServerTransport();
+  let storageClosed = false;
   const shutdown = async () => {
     await provider.close?.().catch(() => undefined);
+    if (!storageClosed) {
+      db.close();
+      storageClosed = true;
+    }
   };
 
   process.once("SIGINT", () => {

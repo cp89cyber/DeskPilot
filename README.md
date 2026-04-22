@@ -40,6 +40,9 @@ This repo was built and verified with:
 - npm `11.10.1`
 - `codex-cli 0.101.0`
 
+Using the same Node binary for `npm install`, `npm run build`, and `node dist/cli.js ...`
+is important because `better-sqlite3` is a native addon.
+
 ## Install
 
 ```bash
@@ -115,9 +118,12 @@ This will:
 - verify Codex is logged in
 - verify Chrome is available for browser mode
 - create `~/.deskpilot/{runtime,logs}`
-- initialize `~/.deskpilot/state.db`
 - copy runtime instructions to `~/.deskpilot/runtime/AGENTS.md`
 - register the `deskpilot-workspace` MCP server with Codex
+
+`~/.deskpilot/state.db` is created later, the first time you run a command that needs
+local persisted state such as `followups`, `actions`, or a workflow command that
+stores session history.
 
 Then authenticate against Google:
 
@@ -141,6 +147,30 @@ OAuth tokens are stored at:
 ```
 
 with `0600` permissions when OAuth is used.
+
+## Troubleshooting
+
+If DeskPilot fails with a `better-sqlite3` / `NODE_MODULE_VERSION` mismatch, check the
+active runtime first:
+
+```bash
+which node
+node -v
+```
+
+Install, build, and run DeskPilot with that same `node` binary. Then rebuild the
+native addon:
+
+```bash
+npm rebuild better-sqlite3
+```
+
+If the rebuild still fails, reinstall dependencies under the same active Node version:
+
+```bash
+rm -rf node_modules
+npm install
+```
 
 ## Commands
 
