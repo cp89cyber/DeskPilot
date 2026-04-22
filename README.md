@@ -65,8 +65,10 @@ Chrome profile under `~/.deskpilot/browser/google-chrome`.
 
 `node dist/cli.js auth google` follows `google.mode` by default:
 
-- In `browser` mode it opens a normal Chrome window with the dedicated DeskPilot
-  profile. You sign in there manually, close that DeskPilot Chrome window, and
+- In `browser` mode it opens a separate Chrome window with the dedicated
+  DeskPilot profile. This profile is intentionally isolated from your normal
+  Chrome session, so first-time sign-in there may not look like your everyday
+  browser. You sign in manually, close that DeskPilot Chrome window, and
   DeskPilot then waits briefly for Chrome to release the profile before
   validating the saved profile with Playwright.
 - In `oauth` mode it opens the Google OAuth flow in your browser and stores
@@ -141,10 +143,13 @@ node dist/cli.js auth google
 
 This uses the provider configured in `google.mode`.
 
-In browser mode, DeskPilot opens a normal Chrome window for manual sign-in, asks
-you to close that DeskPilot Chrome window when Gmail and Calendar are working,
-waits briefly for Chrome to fully release the dedicated profile, and then
-validates the saved profile.
+In browser mode, DeskPilot opens a separate Chrome window for manual sign-in
+using the dedicated DeskPilot profile, prints the launched Chrome PID when it
+can detect one, asks you to close that DeskPilot Chrome window when Gmail and
+Calendar are working, waits briefly for Chrome to fully release the dedicated
+profile, and then validates the saved profile. If the DeskPilot-owned Chrome
+process is still holding the profile after you confirm, DeskPilot tries to
+gracefully close that dedicated process before validation.
 
 If you want to override the configured provider for a single auth run:
 
@@ -171,7 +176,8 @@ an automated browser for the manual Google sign-in step in browser mode.
 
 If browser-mode validation still fails because Chrome is holding the dedicated
 profile open, DeskPilot reports the profile path and the holding PID when it can
-detect one.
+detect one. DeskPilot also tries to close the dedicated Chrome process it
+launched for that auth run before surfacing the error.
 
 ## Troubleshooting
 
