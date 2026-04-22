@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "date",
+    "summary",
+    "priorities",
+    "meetings",
+    "urgentThreads",
+    "followUps",
+    "sourceRefs"
+  ],
+  "properties": {
+    "date": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "priorities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "meetings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "start",
+          "prepNotes",
+          "sourceRefs"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          },
+          "end": {
+            "type": "string"
+          },
+          "prepNotes": {
+            "type": "string"
+          },
+          "relatedFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sourceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "urgentThreads": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "threadId",
+          "subject",
+          "reason"
+        ],
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "followUps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "status",
+          "sourceRefs"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "dueAt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "sourceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "sourceRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
