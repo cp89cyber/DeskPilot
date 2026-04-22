@@ -23,8 +23,12 @@ export async function ensureCodexLoggedIn(config: DeskPilotConfig): Promise<void
   const result = await execa(config.codexBinary, ["login", "status"], {
     reject: false,
   });
-  if (result.exitCode !== 0 || !/Logged in/i.test(result.stdout)) {
-    throw new Error("Codex is not logged in. Run `codex login` first.");
+  if (result.exitCode !== 0) {
+    const diagnostics = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
+    const message = diagnostics
+      ? `Codex is not logged in. Run \`codex login\` first.\n\n${diagnostics}`
+      : "Codex is not logged in. Run `codex login` first.";
+    throw new Error(message);
   }
 }
 
