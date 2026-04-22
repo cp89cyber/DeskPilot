@@ -67,7 +67,8 @@ Chrome profile under `~/.deskpilot/browser/google-chrome`.
 
 - In `browser` mode it opens a normal Chrome window with the dedicated DeskPilot
   profile. You sign in there manually, close that DeskPilot Chrome window, and
-  DeskPilot then validates the saved profile with Playwright.
+  DeskPilot then waits briefly for Chrome to release the profile before
+  validating the saved profile with Playwright.
 - In `oauth` mode it opens the Google OAuth flow in your browser and stores
   tokens at `~/.deskpilot/google-oauth.json`.
 
@@ -141,8 +142,9 @@ node dist/cli.js auth google
 This uses the provider configured in `google.mode`.
 
 In browser mode, DeskPilot opens a normal Chrome window for manual sign-in, asks
-you to close that DeskPilot Chrome window when Gmail and Calendar are working, and
-then validates the saved profile.
+you to close that DeskPilot Chrome window when Gmail and Calendar are working,
+waits briefly for Chrome to fully release the dedicated profile, and then
+validates the saved profile.
 
 If you want to override the configured provider for a single auth run:
 
@@ -166,6 +168,10 @@ with `0600` permissions when OAuth is used.
 Google may reject first-time sign-in attempts inside automated browsers with
 errors such as "This browser or app may not be secure". DeskPilot no longer uses
 an automated browser for the manual Google sign-in step in browser mode.
+
+If browser-mode validation still fails because Chrome is holding the dedicated
+profile open, DeskPilot reports the profile path and the holding PID when it can
+detect one.
 
 ## Troubleshooting
 

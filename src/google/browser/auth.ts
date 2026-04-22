@@ -5,6 +5,7 @@ import { execa } from "execa";
 import type { DeskPilotConfig } from "../../types/config.js";
 import {
   BrowserGoogleSessionManager,
+  BrowserProfileInUseError,
   validateBrowserGoogleProfile,
 } from "./session.js";
 import { browserAuthTargets } from "./targets.js";
@@ -30,6 +31,7 @@ function nativeChromeArgs(profileDir: string): string[] {
     "--new-window",
     "--no-first-run",
     "--no-default-browser-check",
+    "--disable-background-mode",
     targets.gmailUrl,
     targets.calendarUrl,
   ];
@@ -79,6 +81,30 @@ function browserValidationError(profileDir: string, error: unknown): Error {
   );
 }
 
+function browserProfileInUseValidationError(
+  profileDir: string,
+  error: BrowserProfileInUseError,
+): Error {
+  const details = [
+    "DeskPilot could not validate the saved Chrome profile because Chrome is still using it.",
+    `Profile: ${profileDir}`,
+  ];
+
+  if (error.pid !== undefined) {
+    details.push(
+      `Holding PID: ${error.pid}${error.host ? ` on ${error.host}` : ""}`,
+    );
+  } else if (error.host) {
+    details.push(`Holding host: ${error.host}`);
+  }
+
+  details.push(
+    `Fully quit every DeskPilot Chrome window using ${profileDir}, wait a few seconds, and rerun \`deskpilot auth google --provider browser\`.`,
+  );
+
+  return new Error(details.join("\n"));
+}
+
 export async function authenticateBrowserProfile(config: DeskPilotConfig): Promise<void> {
   requiresInteractiveTerminal();
 
@@ -95,11 +121,15 @@ export async function authenticateBrowserProfile(config: DeskPilotConfig): Promi
 
   console.log("Sign in to Gmail and Google Calendar in the opened Chrome window.");
   console.log("When both load successfully, close every DeskPilot Chrome window using that profile.");
+  console.log("After you press Enter, DeskPilot will wait briefly for Chrome to fully release the profile.");
   await waitForUserConfirmation();
 
   try {
     await validateBrowserGoogleProfile(session);
   } catch (error) {
+    if (error instanceof BrowserProfileInUseError) {
+      throw browserProfileInUseValidationError(session.profileDir, error);
+    }
     throw browserValidationError(session.profileDir, error);
   } finally {
     await session.close();
