@@ -28,6 +28,14 @@ export interface RunWorkflowOptions {
   workflow: CodexWorkflow;
   prompt: string;
   extraArgs?: string[];
+  resume?: boolean;
+  outputSchema?: RunWorkflowOutputSchema;
+}
+
+export interface RunWorkflowOutputSchema {
+  path: string;
+  text: string;
+  validate(value: unknown): unknown;
 }
 
 interface CodexCommandResult {
@@ -40,6 +48,7 @@ interface CodexCommandResult {
 
 const DEFAULT_CODEX_TIMEOUT_MS = 10 * 60 * 1000;
 const PROGRESS_INTERVAL_MS = 30_000;
+const MCP_TOOL_CANCELLED_MESSAGE = "user cancelled MCP tool call";
 
 function configuredCodexTimeoutMs(): number {
   const raw = process.env.DESKPILOT_CODEX_TIMEOUT_MS;
@@ -131,6 +140,38 @@ function collectErrorMessages(events: CodexEvent[]): string[] {
     .map((message) => message.trim());
 
   return [...new Set(messages)];
+}
+
+function valueContainsText(value: unknown, expectedText: string): boolean {
+  if (typeof value === "string") {
+    return value.includes(expectedText);
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((item) => valueContainsText(item, expectedText));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.values(value).some((item) => valueContainsText(item, expectedText));
+  }
+
+  return false;
+}
+
+function hasCancelledMcpToolCall(result: CodexCommandResult, events: CodexEvent[]): boolean {
+  return (
+    result.stdout.includes(MCP_TOOL_CANCELLED_MESSAGE) ||
+    result.stderr.includes(MCP_TOOL_CANCELLED_MESSAGE) ||
+    events.some((event) => valueContainsText(event, MCP_TOOL_CANCELLED_MESSAGE))
+  );
+}
+
+function formatCancelledMcpToolCall(workflow: CodexWorkflow): string {
+  return [
+    `Codex cancelled an MCP tool call while running the ${workflow} workflow.`,
+    "This usually means a noninteractive Codex run attempted to use a tool that required approval.",
+    "DeskPilot cannot trust the workflow result because required workspace data may be missing.",
+  ].join(" ");
 }
 
 function formatCodexFailure(
@@ -295,9 +336,22 @@ async function runCodexCommand(
   return result;
 }
 
-function parseStructuredOutput(workflow: Exclude<CodexWorkflow, "chat">, rawText: string): unknown {
+function parseStructuredOutput(rawText: string, outputSchema: RunWorkflowOutputSchema): unknown {
   const parsed = JSON.parse(rawText) as unknown;
-  return validateWorkflowResult(workflow, parsed);
+  return outputSchema.validate(parsed);
+}
+
+function outputSchemaForWorkflow(
+  config: DeskPilotConfig,
+  workflow: Exclude<CodexWorkflow, "chat">,
+): RunWorkflowOutputSchema {
+  return {
+    path: schemaPathForWorkflow(config, workflow),
+    text: schemaTextForWorkflow(config, workflow),
+    validate(value) {
+      return validateWorkflowResult(workflow, value);
+    },
+  };
 }
 
 export async function runWorkflow(
@@ -306,11 +360,15 @@ export async function runWorkflow(
   options: RunWorkflowOptions,
   logger?: Logger,
 ): Promise<CodexRunResult> {
-  const priorSession = getWorkflowSession(repositories, options.workflow);
+  const shouldResume = options.resume ?? true;
+  const priorSession = shouldResume ? getWorkflowSession(repositories, options.workflow) : undefined;
   const outputFilePath = tempOutputPath(options.workflow);
   const extraArgs = options.extraArgs ?? [];
   const structuredWorkflow = options.workflow === "chat" ? undefined : options.workflow;
-  const isStructuredWorkflow = structuredWorkflow !== undefined;
+  const outputSchema =
+    options.outputSchema ??
+    (structuredWorkflow ? outputSchemaForWorkflow(config, structuredWorkflow) : undefined);
+  const isStructuredWorkflow = outputSchema !== undefined;
   const resumed = Boolean(priorSession);
 
   let args: string[];
@@ -331,16 +389,16 @@ export async function runWorkflow(
     ];
 
     if (isStructuredWorkflow) {
-      args.push("--output-schema", schemaPathForWorkflow(config, structuredWorkflow));
+      args.push("--output-schema", outputSchema.path);
     }
 
     args.push(options.prompt);
   } else {
     const prompt = isStructuredWorkflow
       ? buildResumeSchemaPrompt(
-          structuredWorkflow,
+          structuredWorkflow ?? options.workflow,
           options.prompt,
-          schemaTextForWorkflow(config, structuredWorkflow),
+          outputSchema.text,
         )
       : options.prompt;
 
@@ -355,11 +413,15 @@ export async function runWorkflow(
   }
 
   const result = await runCodexCommand(config, options.workflow, args, logger);
-  if (result.exitCode !== 0 || result.timedOut) {
-    throw new Error(formatCodexFailure(options.workflow, result));
+  const events = result.events.length > 0 ? result.events : parseJsonLines(result.stdout);
+  if (hasCancelledMcpToolCall(result, events)) {
+    throw new Error(formatCancelledMcpToolCall(options.workflow));
   }
 
-  const events = result.events.length > 0 ? result.events : parseJsonLines(result.stdout);
+  if (result.exitCode !== 0 || result.timedOut) {
+    throw new Error(formatCodexFailure(options.workflow, { ...result, events }));
+  }
+
   const sessionId = extractSessionId(events) ?? priorSession?.codexSessionId;
   if (!sessionId) {
     throw new Error(`Could not determine Codex session ID for workflow ${options.workflow}.`);
@@ -373,7 +435,7 @@ export async function runWorkflow(
   if (!resumed && fs.existsSync(outputFilePath)) {
     finalMessage = fs.readFileSync(outputFilePath, "utf8").trim();
     if (isStructuredWorkflow && finalMessage) {
-      parsedOutput = parseStructuredOutput(structuredWorkflow, finalMessage);
+      parsedOutput = parseStructuredOutput(finalMessage, outputSchema);
     }
   }
 
@@ -382,7 +444,7 @@ export async function runWorkflow(
   }
 
   if (isStructuredWorkflow && parsedOutput === undefined && finalMessage) {
-    parsedOutput = parseStructuredOutput(structuredWorkflow, finalMessage);
+    parsedOutput = parseStructuredOutput(finalMessage, outputSchema);
   }
 
   return {

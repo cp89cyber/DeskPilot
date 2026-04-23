@@ -36,6 +36,42 @@ export const inboxTriageSchema = z.object({
   sourceRefs: z.array(z.string()),
 });
 
+export const inboxAnalysisSchema = z.object({
+  overview: z.string(),
+  urgentThreads: z.array(
+    z.object({
+      threadId: z.string(),
+      subject: z.string(),
+      reason: z.string(),
+    }),
+  ),
+  replyRecommendations: z.array(
+    z.object({
+      threadId: z.string(),
+      recommendation: z.string(),
+      draft: z
+        .object({
+          threadId: z.string(),
+          to: z.array(z.string()),
+          cc: z.array(z.string()),
+          bcc: z.array(z.string()),
+          subject: z.string(),
+          bodyText: z.string(),
+        })
+        .nullable(),
+    }),
+  ),
+  followUps: z.array(
+    z.object({
+      title: z.string(),
+      dueAt: nullableString,
+      status: z.string(),
+      sourceRefs: z.array(z.string()),
+    }),
+  ),
+  sourceRefs: z.array(z.string()),
+});
+
 export const dailyBriefSchema = z.object({
   date: z.string(),
   summary: z.string(),
@@ -100,6 +136,20 @@ export const documentSummarySchema = z.object({
   actionItems: z.array(z.string()),
   sourceRefs: z.array(z.string()),
 });
+
+export type InboxAnalysisResult = z.infer<typeof inboxAnalysisSchema>;
+
+export function schemaPathForInboxAnalysis(config: DeskPilotConfig): string {
+  return path.join(config.repoRoot, "schemas", "inbox-analysis.json");
+}
+
+export function schemaTextForInboxAnalysis(config: DeskPilotConfig): string {
+  return fs.readFileSync(schemaPathForInboxAnalysis(config), "utf8");
+}
+
+export function validateInboxAnalysisResult(value: unknown): InboxAnalysisResult {
+  return inboxAnalysisSchema.parse(value);
+}
 
 export function schemaPathForWorkflow(
   config: DeskPilotConfig,

@@ -237,7 +237,7 @@ waiting silently.
 
 ```bash
 node dist/cli.js ask "Draft a concise reply asking for two scheduling options"
-node dist/cli.js inbox --query "in:inbox newer_than:7d"
+node dist/cli.js inbox --query "in:inbox newer_than:7d" --max-results 10
 node dist/cli.js brief today
 node dist/cli.js schedule "Find 30 minutes with finance next week to review the budget"
 node dist/cli.js summarize ./notes/meeting.txt

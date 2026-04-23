@@ -23,6 +23,25 @@ export function buildInboxPrompt(config: DeskPilotConfig, query: string): string
   );
 }
 
+export function buildInboxAnalysisPrompt(
+  config: DeskPilotConfig,
+  payload: unknown,
+): string {
+  return joinSections(
+    readPrompt(config, "system.md"),
+    [
+      "Analyze the Gmail inbox thread JSON provided below.",
+      "Do not call tools. The Gmail data has already been fetched by DeskPilot.",
+      "Use only the provided thread IDs, message content, and participants.",
+      "For sourceRefs, use only strings in the form thread:<threadId>.",
+      "If a reply is useful, include a draft object. If no draft should be staged, set draft to null.",
+      "Draft recipients must be selected only from that thread's participants.",
+      "Return only JSON that conforms to the configured schema.",
+    ].join("\n"),
+    `Inbox data:\n${JSON.stringify(payload, null, 2)}`,
+  );
+}
+
 export function buildBriefPrompt(
   config: DeskPilotConfig,
   todayIsoDate: string,
@@ -79,7 +98,7 @@ export function buildSummarizePrompt(
 }
 
 export function buildResumeSchemaPrompt(
-  workflow: Exclude<CodexWorkflow, "chat">,
+  workflow: CodexWorkflow,
   basePrompt: string,
   schemaText: string,
 ): string {

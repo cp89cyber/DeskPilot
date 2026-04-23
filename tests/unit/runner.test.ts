@@ -45,10 +45,10 @@ function makeConfig(): DeskPilotConfig {
   };
 }
 
-function makeRepositories(): DeskPilotRepositories {
+function makeRepositories(priorSession?: { workflow: "chat"; codexSessionId: string; lastUsedAt: string }): DeskPilotRepositories {
   return {
     sessions: {
-      get: vi.fn(() => undefined),
+      get: vi.fn(() => priorSession),
       upsert: vi.fn((workflow, codexSessionId) => ({
         workflow,
         codexSessionId,
@@ -173,5 +173,73 @@ describe("runWorkflow", () => {
 
     child.emit("exit", null);
     await expect(resultPromise).rejects.toThrow(/timed out/);
+  });
+
+  it("starts a fresh session when resume is disabled and passes extra args", async () => {
+    const child = makeChildProcess();
+    mocks.spawn.mockReturnValueOnce(child);
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const repositories = makeRepositories({
+      workflow: "chat",
+      codexSessionId: "prior-thread",
+      lastUsedAt: "2026-04-22T00:00:00.000Z",
+    });
+
+    const resultPromise = runWorkflow(
+      makeConfig(),
+      repositories,
+      {
+        workflow: "chat",
+        prompt: "Say ready.",
+        resume: false,
+        extraArgs: ["-c", "mcp_servers.deskpilot-workspace.enabled=false"],
+      },
+    );
+
+    child.stdout.emit("data", Buffer.from('{"type":"thread.started","thread_id":"fresh-thread"}\n'));
+    child.stdout.emit(
+      "data",
+      Buffer.from('{"type":"item.completed","item":{"type":"agent_message","text":"ready"}}\n'),
+    );
+    child.emit("exit", 0);
+
+    const result = await resultPromise;
+    const args = mocks.spawn.mock.calls[0]?.[1] as string[];
+
+    expect(result.sessionId).toBe("fresh-thread");
+    expect(result.resumed).toBe(false);
+    expect(repositories.sessions.get).not.toHaveBeenCalled();
+    expect(args).toContain("-c");
+    expect(args).toContain("mcp_servers.deskpilot-workspace.enabled=false");
+    expect(args.slice(0, 2)).toEqual(["exec", "-m"]);
+    expect(args).not.toContain("resume");
+  });
+
+  it("rejects results when Codex reports a cancelled MCP tool call", async () => {
+    const child = makeChildProcess();
+    mocks.spawn.mockReturnValueOnce(child);
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const repositories = makeRepositories();
+
+    const resultPromise = runWorkflow(
+      makeConfig(),
+      repositories,
+      {
+        workflow: "chat",
+        prompt: "Say ready.",
+      },
+    );
+
+    child.stdout.emit("data", Buffer.from('{"type":"thread.started","thread_id":"thread-3"}\n'));
+    child.stdout.emit(
+      "data",
+      Buffer.from(
+        '{"type":"item.completed","item":{"type":"tool_call_output","text":"user cancelled MCP tool call"}}\n',
+      ),
+    );
+    child.emit("exit", 0);
+
+    await expect(resultPromise).rejects.toThrow(/noninteractive Codex run attempted to use a tool/);
+    expect(repositories.sessions.upsert).not.toHaveBeenCalled();
   });
 });
