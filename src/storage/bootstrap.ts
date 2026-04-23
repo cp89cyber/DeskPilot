@@ -15,6 +15,12 @@ export interface InitializedStorage {
 
 export type StorageModuleLoader = () => Promise<StorageModules>;
 
+type BetterSqliteDatabaseConstructor = {
+  new(filename?: string | Buffer, options?: Database.Options): Database.Database;
+};
+
+export type BetterSqliteModuleLoader = () => Promise<unknown>;
+
 function errorCode(error: unknown): string | undefined {
   if (!error || typeof error !== "object" || !("code" in error)) {
     return undefined;
@@ -72,6 +78,27 @@ function normalizeStorageError(error: unknown): Error {
   return new Error(formatBetterSqliteRuntimeError(message), {
     cause: error instanceof Error ? error : undefined,
   });
+}
+
+function databaseConstructorFromModule(module: unknown): BetterSqliteDatabaseConstructor {
+  const candidate =
+    module && typeof module === "object" && "default" in module
+      ? (module as { default: unknown }).default
+      : module;
+
+  return candidate as BetterSqliteDatabaseConstructor;
+}
+
+export async function assertStorageRuntimeCompatible(
+  loadModule: BetterSqliteModuleLoader = async () => await import("better-sqlite3"),
+): Promise<void> {
+  try {
+    const DatabaseConstructor = databaseConstructorFromModule(await loadModule());
+    const db = new DatabaseConstructor(":memory:");
+    db.close();
+  } catch (error) {
+    throw normalizeStorageError(error);
+  }
 }
 
 export async function loadStorageModules(): Promise<StorageModules> {

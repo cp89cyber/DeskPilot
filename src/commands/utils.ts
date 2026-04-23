@@ -2,19 +2,14 @@ import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 
 import type { DeskPilotConfig } from "../types/config.js";
-import { ensureWorkspaceMcpRegistered } from "../prereqs.js";
+import { assertWorkspaceMcpReady } from "../prereqs.js";
 
 export function printJson(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));
 }
 
 export async function assertWorkspaceReady(config: DeskPilotConfig): Promise<void> {
-  const registered = await ensureWorkspaceMcpRegistered(config);
-  if (!registered) {
-    throw new Error(
-      "DeskPilot MCP server is not registered with Codex. Run `deskpilot setup` first.",
-    );
-  }
+  await assertWorkspaceMcpReady(config);
 }
 
 export async function confirm(promptText: string): Promise<boolean> {

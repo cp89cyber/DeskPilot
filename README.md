@@ -203,6 +203,34 @@ rm -rf node_modules
 npm install
 ```
 
+### Workflow commands appear to hang
+
+DeskPilot workflow commands run Codex, and Codex starts the registered
+`deskpilot-workspace` MCP server. That MCP registration stores the exact Node
+binary that should launch DeskPilot's server. If you install/build with one Node
+version and Codex launches the MCP server with another, native dependencies such
+as `better-sqlite3` can fail before tools are available. Older DeskPilot builds
+could look idle in that state because workflow output was buffered until Codex
+exited.
+
+Use one Node runtime consistently from the same shell:
+
+```bash
+which node
+node -v
+npm rebuild better-sqlite3
+npm run build
+node dist/cli.js setup
+```
+
+`setup` validates the active `better-sqlite3` runtime, smoke-tests the MCP
+server, and repairs stale Codex MCP registration so it points at the current
+`node` binary and `dist/mcp/workspaceServer.js`.
+
+Workflow commands write progress and diagnostics to stderr. If Codex or the MCP
+server fails, the command should now fail with the relevant error instead of
+waiting silently.
+
 ## Commands
 
 ### Core workflows
