@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { validateWorkflowResult } from "../../src/codex/schemas.js";
+import { validateInboxAnalysisResult, validateWorkflowResult } from "../../src/codex/schemas.js";
 
 const repoRoot = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 
@@ -45,6 +45,7 @@ describe("workflow JSON schemas", () => {
     for (const fileName of [
       "daily-brief.json",
       "document-summary.json",
+      "inbox-analysis.json",
       "inbox-triage.json",
       "schedule-plan.json",
     ]) {
@@ -104,5 +105,29 @@ describe("workflow JSON schemas", () => {
     expect(schedule.proposedSlots).toBeUndefined();
     expect(schedule.draftInvitation).toBeUndefined();
     expect(schedule.stagedActionId).toBeUndefined();
+
+    const analysis = validateInboxAnalysisResult({
+      overview: "One thread needs a reply.",
+      urgentThreads: [],
+      replyRecommendations: [
+        {
+          threadId: "thread-1",
+          recommendation: "Reply with the requested status.",
+          draft: null,
+        },
+      ],
+      followUps: [
+        {
+          title: "Send status",
+          dueAt: null,
+          status: "open",
+          sourceRefs: ["thread:thread-1"],
+        },
+      ],
+      sourceRefs: ["thread:thread-1"],
+    });
+
+    expect(analysis.replyRecommendations[0]?.draft).toBeNull();
+    expect(analysis.followUps[0]?.dueAt).toBeUndefined();
   });
 });

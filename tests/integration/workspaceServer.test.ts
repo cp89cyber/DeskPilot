@@ -148,6 +148,22 @@ describe("workspace MCP server", () => {
 
     expect(toolNames).toContain("gmail_list_threads");
     expect(toolNames).toContain("stage_gmail_draft");
+    expect(tools.tools.find((tool) => tool.name === "gmail_list_threads")?.annotations).toMatchObject({
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    });
+    expect(tools.tools.find((tool) => tool.name === "followups_list")?.annotations).toMatchObject({
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    });
+    expect(tools.tools.find((tool) => tool.name === "stage_gmail_draft")?.annotations).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    });
 
     const gmailListResult = await client.callTool({
       name: "gmail_list_threads",

@@ -21,6 +21,19 @@ import type { DeskPilotRepositories } from "../storage/repositories.js";
 import type { CalendarEventPayload, GmailDraftPayload, PendingAction } from "../types/actions.js";
 import type { FollowupItem } from "../types/results.js";
 
+const readOnlyToolAnnotations = {
+  readOnlyHint: true,
+  destructiveHint: false,
+  openWorldHint: false,
+} as const;
+
+const stageToolAnnotations = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: false,
+  openWorldHint: false,
+} as const;
+
 interface WorkspaceServices {
   capabilities: GoogleWorkspaceCapabilities;
   gmail?: {
@@ -124,6 +137,7 @@ export function createWorkspaceServer(services: WorkspaceServices): McpServer {
       "gmail_list_threads",
       {
         description: "List Gmail threads for the authenticated DeskPilot user.",
+        annotations: readOnlyToolAnnotations,
         inputSchema: {
           query: z.string().optional(),
           maxResults: z.number().int().min(1).max(50).optional(),
@@ -139,6 +153,7 @@ export function createWorkspaceServer(services: WorkspaceServices): McpServer {
       "gmail_get_thread",
       {
         description: "Get the full contents of a Gmail thread by ID.",
+        annotations: readOnlyToolAnnotations,
         inputSchema: {
           threadId: z.string(),
         },
@@ -158,6 +173,7 @@ export function createWorkspaceServer(services: WorkspaceServices): McpServer {
       "calendar_list_events",
       {
         description: "List events on the user's primary Google Calendar.",
+        annotations: readOnlyToolAnnotations,
         inputSchema: {
           timeMin: z.string().optional(),
           timeMax: z.string().optional(),
@@ -174,6 +190,7 @@ export function createWorkspaceServer(services: WorkspaceServices): McpServer {
       "calendar_find_availability",
       {
         description: "Find open time slots on the user's calendar.",
+        annotations: readOnlyToolAnnotations,
         inputSchema: {
           durationMinutes: z.number().int().positive(),
           timeMin: z.string().optional(),
@@ -198,6 +215,7 @@ export function createWorkspaceServer(services: WorkspaceServices): McpServer {
       "drive_search",
       {
         description: "Search Google Drive files by query string.",
+        annotations: readOnlyToolAnnotations,
         inputSchema: {
           query: z.string(),
           maxResults: z.number().int().min(1).max(20).optional(),
@@ -213,6 +231,7 @@ export function createWorkspaceServer(services: WorkspaceServices): McpServer {
       "drive_get_file",
       {
         description: "Download and normalize a Drive file by ID.",
+        annotations: readOnlyToolAnnotations,
         inputSchema: {
           fileId: z.string(),
         },
@@ -228,6 +247,7 @@ export function createWorkspaceServer(services: WorkspaceServices): McpServer {
     "followups_list",
     {
       description: "List locally persisted DeskPilot follow-up items.",
+      annotations: readOnlyToolAnnotations,
       inputSchema: {
         status: z.string().optional(),
       },
@@ -242,6 +262,7 @@ export function createWorkspaceServer(services: WorkspaceServices): McpServer {
     "stage_gmail_draft",
     {
       description: "Stage a Gmail draft without sending it.",
+      annotations: stageToolAnnotations,
       inputSchema: {
         to: z.array(z.string()).min(1),
         cc: z.array(z.string()).optional(),
@@ -270,6 +291,7 @@ export function createWorkspaceServer(services: WorkspaceServices): McpServer {
     "stage_calendar_event",
     {
       description: "Stage a calendar event without creating it yet.",
+      annotations: stageToolAnnotations,
       inputSchema: {
         summary: z.string(),
         description: z.string().optional(),
