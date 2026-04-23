@@ -32,7 +32,9 @@
         "required": [
           "title",
           "start",
+          "end",
           "prepNotes",
+          "relatedFiles",
           "sourceRefs"
         ],
         "properties": {
@@ -43,13 +45,19 @@
             "type": "string"
           },
           "end": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "prepNotes": {
             "type": "string"
           },
           "relatedFiles": {
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "string"
             }
@@ -93,6 +101,7 @@
         "additionalProperties": false,
         "required": [
           "title",
+          "dueAt",
           "status",
           "sourceRefs"
         ],
@@ -101,7 +110,10 @@
             "type": "string"
           },
           "dueAt": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "string"

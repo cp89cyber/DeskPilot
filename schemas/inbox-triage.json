@@ -44,7 +44,8 @@
         "additionalProperties": false,
         "required": [
           "threadId",
-          "recommendation"
+          "recommendation",
+          "stagedActionId"
         ],
         "properties": {
           "threadId": {
@@ -54,7 +55,10 @@
             "type": "string"
           },
           "stagedActionId": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       }
@@ -66,6 +70,7 @@
         "additionalProperties": false,
         "required": [
           "title",
+          "dueAt",
           "status",
           "sourceRefs"
         ],
@@ -74,7 +79,10 @@
             "type": "string"
           },
           "dueAt": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "type": "string"

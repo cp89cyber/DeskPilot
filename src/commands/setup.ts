@@ -8,12 +8,13 @@ import {
   ensureCodexInstalled,
   ensureCodexLoggedIn,
   ensureGoogleBrowserAvailable,
-  ensureWorkspaceMcpRegistered,
   ensureWorkspaceServerBuilt,
-  registerWorkspaceMcpServer,
+  repairWorkspaceMcpRegistration,
   resolvedGoogleBrowserDetails,
+  smokeTestWorkspaceMcpServer,
 } from "../prereqs.js";
 import { createBaseContext } from "../runtime.js";
+import { assertStorageRuntimeCompatible } from "../storage/bootstrap.js";
 
 export function registerSetupCommand(program: Command): void {
   program
@@ -27,6 +28,8 @@ export function registerSetupCommand(program: Command): void {
       await ensureCodexInstalled(config);
       await ensureCodexLoggedIn(config);
       await ensureWorkspaceServerBuilt(config);
+      await assertStorageRuntimeCompatible();
+      await smokeTestWorkspaceMcpServer(config);
       let browser:
         | {
             executablePath: string;
@@ -42,10 +45,13 @@ export function registerSetupCommand(program: Command): void {
       const runtimeAgentsTarget = path.join(config.runtimeDir, "AGENTS.md");
       fs.copyFileSync(runtimeAgentsSource, runtimeAgentsTarget);
 
-      const alreadyRegistered = await ensureWorkspaceMcpRegistered(config);
-      if (!alreadyRegistered) {
-        await registerWorkspaceMcpServer(config);
-        logger.info("Registered DeskPilot MCP server");
+      const mcpRepair = await repairWorkspaceMcpRegistration(config);
+      if (mcpRepair.action !== "unchanged") {
+        logger.info(
+          mcpRepair.action === "registered"
+            ? "Registered DeskPilot MCP server"
+            : "Repaired DeskPilot MCP server",
+        );
       }
 
       console.log("DeskPilot setup complete.");
@@ -57,9 +63,9 @@ export function registerSetupCommand(program: Command): void {
         console.log(`Browser profile: ${browser.profileDir}`);
       }
       console.log(
-        alreadyRegistered
+        mcpRepair.action === "unchanged"
           ? `MCP server '${config.mcpServerName}' already registered.`
-          : `MCP server '${config.mcpServerName}' registered.`,
+          : `MCP server '${config.mcpServerName}' ${mcpRepair.action}.`,
       );
     });
 }

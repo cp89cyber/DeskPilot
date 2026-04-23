@@ -5,6 +5,9 @@ import { z } from "zod";
 
 import type { DeskPilotConfig, CodexWorkflow } from "../types/config.js";
 
+const nullableString = z.string().nullish().transform((value) => value ?? undefined);
+const nullableStringArray = z.array(z.string()).nullish().transform((value) => value ?? undefined);
+
 export const inboxTriageSchema = z.object({
   overview: z.string(),
   urgentThreads: z.array(
@@ -18,13 +21,13 @@ export const inboxTriageSchema = z.object({
     z.object({
       threadId: z.string(),
       recommendation: z.string(),
-      stagedActionId: z.string().optional(),
+      stagedActionId: nullableString,
     }),
   ),
   followUps: z.array(
     z.object({
       title: z.string(),
-      dueAt: z.string().optional(),
+      dueAt: nullableString,
       status: z.string(),
       sourceRefs: z.array(z.string()),
     }),
@@ -41,9 +44,9 @@ export const dailyBriefSchema = z.object({
     z.object({
       title: z.string(),
       start: z.string(),
-      end: z.string().optional(),
+      end: nullableString,
       prepNotes: z.string(),
-      relatedFiles: z.array(z.string()).optional(),
+      relatedFiles: nullableStringArray,
       sourceRefs: z.array(z.string()),
     }),
   ),
@@ -57,7 +60,7 @@ export const dailyBriefSchema = z.object({
   followUps: z.array(
     z.object({
       title: z.string(),
-      dueAt: z.string().optional(),
+      dueAt: nullableString,
       status: z.string(),
       sourceRefs: z.array(z.string()),
     }),
@@ -67,8 +70,8 @@ export const dailyBriefSchema = z.object({
 
 export const schedulePlanSchema = z.object({
   needsClarification: z.boolean(),
-  clarifyingQuestion: z.string().optional(),
-  summary: z.string().optional(),
+  clarifyingQuestion: nullableString,
+  summary: nullableString,
   proposedSlots: z
     .array(
       z.object({
@@ -77,14 +80,16 @@ export const schedulePlanSchema = z.object({
         reason: z.string(),
       }),
     )
-    .optional(),
+    .nullish()
+    .transform((value) => value ?? undefined),
   draftInvitation: z
     .object({
       subject: z.string(),
       body: z.string(),
     })
-    .optional(),
-  stagedActionId: z.string().optional(),
+    .nullish()
+    .transform((value) => value ?? undefined),
+  stagedActionId: nullableString,
   sourceRefs: z.array(z.string()),
 });
 

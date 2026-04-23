@@ -14,10 +14,11 @@ const mocks = vi.hoisted(() => ({
   ensureCodexInstalled: vi.fn(),
   ensureCodexLoggedIn: vi.fn(),
   ensureGoogleBrowserAvailable: vi.fn(),
-  ensureWorkspaceMcpRegistered: vi.fn(),
   ensureWorkspaceServerBuilt: vi.fn(),
-  registerWorkspaceMcpServer: vi.fn(),
+  repairWorkspaceMcpRegistration: vi.fn(),
   resolvedGoogleBrowserDetails: vi.fn(),
+  smokeTestWorkspaceMcpServer: vi.fn(),
+  assertStorageRuntimeCompatible: vi.fn(),
 }));
 
 vi.mock("../../src/runtime.js", () => ({
@@ -29,10 +30,14 @@ vi.mock("../../src/prereqs.js", () => ({
   ensureCodexInstalled: mocks.ensureCodexInstalled,
   ensureCodexLoggedIn: mocks.ensureCodexLoggedIn,
   ensureGoogleBrowserAvailable: mocks.ensureGoogleBrowserAvailable,
-  ensureWorkspaceMcpRegistered: mocks.ensureWorkspaceMcpRegistered,
   ensureWorkspaceServerBuilt: mocks.ensureWorkspaceServerBuilt,
-  registerWorkspaceMcpServer: mocks.registerWorkspaceMcpServer,
+  repairWorkspaceMcpRegistration: mocks.repairWorkspaceMcpRegistration,
   resolvedGoogleBrowserDetails: mocks.resolvedGoogleBrowserDetails,
+  smokeTestWorkspaceMcpServer: mocks.smokeTestWorkspaceMcpServer,
+}));
+
+vi.mock("../../src/storage/bootstrap.js", () => ({
+  assertStorageRuntimeCompatible: mocks.assertStorageRuntimeCompatible,
 }));
 
 import { registerSetupCommand } from "../../src/commands/setup.js";
@@ -89,9 +94,16 @@ describe("setup command", () => {
     mocks.ensureCodexInstalled.mockResolvedValue(undefined);
     mocks.ensureCodexLoggedIn.mockResolvedValue(undefined);
     mocks.ensureGoogleBrowserAvailable.mockImplementation(() => undefined);
-    mocks.ensureWorkspaceMcpRegistered.mockResolvedValue(false);
     mocks.ensureWorkspaceServerBuilt.mockResolvedValue(undefined);
-    mocks.registerWorkspaceMcpServer.mockResolvedValue(undefined);
+    mocks.repairWorkspaceMcpRegistration.mockResolvedValue({
+      action: "registered",
+      inspection: {
+        status: "missing",
+        reasons: [],
+      },
+    });
+    mocks.smokeTestWorkspaceMcpServer.mockResolvedValue(undefined);
+    mocks.assertStorageRuntimeCompatible.mockResolvedValue(undefined);
     mocks.resolvedGoogleBrowserDetails.mockReturnValue({
       executablePath: "/usr/bin/google-chrome",
       profileDir: "/tmp/browser-profile",
@@ -125,8 +137,57 @@ describe("setup command", () => {
     expect(mocks.ensureCodexInstalled).toHaveBeenCalledWith(config);
     expect(mocks.ensureCodexLoggedIn).toHaveBeenCalledWith(config);
     expect(mocks.ensureWorkspaceServerBuilt).toHaveBeenCalledWith(config);
-    expect(mocks.registerWorkspaceMcpServer).toHaveBeenCalledWith(config);
+    expect(mocks.assertStorageRuntimeCompatible).toHaveBeenCalledTimes(1);
+    expect(mocks.smokeTestWorkspaceMcpServer).toHaveBeenCalledWith(config);
+    expect(mocks.repairWorkspaceMcpRegistration).toHaveBeenCalledWith(config);
     expect(fs.existsSync(config.dbPath)).toBe(false);
     expect(fs.existsSync(path.join(config.runtimeDir, "AGENTS.md"))).toBe(true);
+  });
+
+  it("surfaces native SQLite preflight failures before MCP registration", async () => {
+    const repoRoot = makeTempDir("deskpilot-setup-repo-");
+    const deskpilotHome = makeTempDir("deskpilot-setup-home-");
+    const logger = makeLogger();
+    const config = makeConfig(repoRoot, deskpilotHome);
+
+    fs.mkdirSync(path.join(repoRoot, "templates"), { recursive: true });
+    fs.writeFileSync(path.join(repoRoot, "templates", "runtime-AGENTS.md"), "# runtime\n", "utf8");
+
+    mocks.createBaseContext.mockReturnValue({ config, logger });
+    mocks.assertStorageRuntimeCompatible.mockRejectedValueOnce(
+      new Error("better-sqlite3 ABI mismatch"),
+    );
+
+    const program = new Command();
+    registerSetupCommand(program);
+
+    await expect(program.parseAsync(["node", "deskpilot", "setup"])).rejects.toThrow(
+      "better-sqlite3 ABI mismatch",
+    );
+    expect(mocks.smokeTestWorkspaceMcpServer).not.toHaveBeenCalled();
+    expect(mocks.repairWorkspaceMcpRegistration).not.toHaveBeenCalled();
+  });
+
+  it("surfaces MCP smoke check failures before registration repair", async () => {
+    const repoRoot = makeTempDir("deskpilot-setup-repo-");
+    const deskpilotHome = makeTempDir("deskpilot-setup-home-");
+    const logger = makeLogger();
+    const config = makeConfig(repoRoot, deskpilotHome);
+
+    fs.mkdirSync(path.join(repoRoot, "templates"), { recursive: true });
+    fs.writeFileSync(path.join(repoRoot, "templates", "runtime-AGENTS.md"), "# runtime\n", "utf8");
+
+    mocks.createBaseContext.mockReturnValue({ config, logger });
+    mocks.smokeTestWorkspaceMcpServer.mockRejectedValueOnce(
+      new Error("MCP server exited before startup completed"),
+    );
+
+    const program = new Command();
+    registerSetupCommand(program);
+
+    await expect(program.parseAsync(["node", "deskpilot", "setup"])).rejects.toThrow(
+      "MCP server exited before startup completed",
+    );
+    expect(mocks.repairWorkspaceMcpRegistration).not.toHaveBeenCalled();
   });
 });

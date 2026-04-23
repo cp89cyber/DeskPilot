@@ -4,7 +4,10 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { initializeStorage } from "../../src/storage/bootstrap.js";
+import {
+  assertStorageRuntimeCompatible,
+  initializeStorage,
+} from "../../src/storage/bootstrap.js";
 import type { DeskPilotConfig } from "../../src/types/config.js";
 
 const tempDirs: string[] = [];
@@ -41,6 +44,35 @@ afterEach(() => {
 });
 
 describe("initializeStorage", () => {
+  it("preflights better-sqlite3 without creating the DeskPilot database", async () => {
+    const config = makeConfig();
+    class MemoryDatabase {
+      close(): void {
+        // Test double.
+      }
+    }
+
+    await assertStorageRuntimeCompatible(async () => ({ default: MemoryDatabase }));
+
+    expect(fs.existsSync(config.dbPath)).toBe(false);
+  });
+
+  it("normalizes better-sqlite3 ABI mismatch errors during preflight", async () => {
+    await expect(
+      assertStorageRuntimeCompatible(async () => {
+        const error = Object.assign(
+          new Error(
+            "The module '/tmp/better_sqlite3.node' was compiled against a different Node.js version using NODE_MODULE_VERSION 137. This version of Node.js requires NODE_MODULE_VERSION 127.",
+          ),
+          {
+            code: "ERR_DLOPEN_FAILED",
+          },
+        );
+        throw error;
+      }),
+    ).rejects.toThrow(/better-sqlite3/);
+  });
+
   it("returns an opened database and repositories when storage modules load", async () => {
     const config = makeConfig();
 
